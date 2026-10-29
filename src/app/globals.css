@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 150 14% 97%;
+    --foreground: 160 18% 10%;
+    --card: 150 20% 99%;
+    --card-foreground: 160 18% 10%;
+    --popover: 150 20% 99%;
+    --popover-foreground: 160 18% 10%;
+    --primary: 158 44% 24%;
+    --primary-foreground: 150 25% 97%;
+    --secondary: 150 10% 93%;
+    --secondary-foreground: 158 20% 14%;
+    --muted: 150 10% 93%;
+    --muted-foreground: 155 8% 41%;
+    --accent: 152 16% 91%;
+    --accent-foreground: 158 28% 16%;
+    --destructive: 4 48% 42%;
+    --destructive-foreground: 0 25% 97%;
+    --border: 150 10% 87%;
+    --input: 150 10% 87%;
+    --ring: 158 44% 24%;
+    --radius: 0.5rem;
+    --success: 153 45% 29%;
+    --success-foreground: 150 25% 97%;
+    --warning: 35 72% 35%;
+    --warning-foreground: 35 40% 97%;
+  }
+
+  .dark {
+    --background: 160 14% 6%;
+    --foreground: 150 12% 93%;
+    --card: 160 13% 8%;
+    --card-foreground: 150 12% 93%;
+    --popover: 160 13% 8%;
+    --popover-foreground: 150 12% 93%;
+    --primary: 152 36% 62%;
+    --primary-foreground: 160 30% 8%;
+    --secondary: 158 10% 15%;
+    --secondary-foreground: 150 12% 93%;
+    --muted: 158 10% 14%;
+    --muted-foreground: 150 8% 63%;
+    --accent: 156 12% 17%;
+    --accent-foreground: 150 12% 93%;
+    --destructive: 4 46% 38%;
+    --destructive-foreground: 0 25% 96%;
+    --border: 158 10% 19%;
+    --input: 158 10% 19%;
+    --ring: 152 36% 62%;
+    --success: 152 38% 58%;
+    --success-foreground: 160 30% 8%;
+    --warning: 38 74% 60%;
+    --warning-foreground: 30 40% 10%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+/* Sticky table header */
+.sticky-header thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  @apply bg-card;
+}
