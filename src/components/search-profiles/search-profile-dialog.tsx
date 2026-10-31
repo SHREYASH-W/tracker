@@ -176,8 +176,9 @@ export function SearchProfileDialog({
       return;
     }
 
+    const context = getValues("name").trim() || undefined;
     setExpanding(true);
-    const result = await expandSearchQuery(prompt);
+    const result = await expandSearchQuery(prompt, context);
     setExpanding(false);
 
     if (!result.success || !result.data) {

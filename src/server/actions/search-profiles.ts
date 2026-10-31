@@ -30,13 +30,19 @@ function serializeProfile(data: z.infer<typeof searchProfileSchema>) {
   };
 }
 
-export async function expandSearchQuery(prompt: string): Promise<ActionResult<ExpandedQuery>> {
+export async function expandSearchQuery(
+  prompt: string,
+  context?: string,
+): Promise<ActionResult<ExpandedQuery>> {
   const parsed = z.string().trim().min(2).max(200).safeParse(prompt);
   if (!parsed.success) {
     return { success: false, message: "Describe your target role first", error: "Describe your target role first" };
   }
 
-  const expansion = await expandQuery(parsed.data);
+  const parsedContext = z.string().trim().max(120).optional().safeParse(context);
+  const expansion = await expandQuery(parsed.data, {
+    context: parsedContext.success ? parsedContext.data : undefined,
+  });
   return {
     success: true,
     message:

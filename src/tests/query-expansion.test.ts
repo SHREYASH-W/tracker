@@ -40,6 +40,17 @@ describe("heuristicExpansion", () => {
     const lower = result.titles.map((title) => title.toLowerCase());
     expect(new Set(lower).size).toBe(lower.length);
   });
+
+  it("uses the profile name as context when the prompt is terse", () => {
+    const result = heuristicExpansion("remote internship", "AI Engineer");
+
+    expect(result.roleType).toBe("internship");
+    expect(result.titles).toContain("Machine Learning Intern");
+    expect(result.titles).toContain("AI Engineer");
+    expect(result.keywords).toContain("python");
+    expect(result.remoteOk).toBe(true);
+    expect(result.locations).toEqual([]);
+  });
 });
 
 describe("detectRoleType / detectExperienceLevel", () => {
@@ -108,5 +119,21 @@ describe("normalizeExpansion", () => {
 
     expect(result.titles).toHaveLength(12);
     expect(result.titles[0]).toBe("Title 0");
+  });
+
+  it("moves remote-like entries out of locations into remoteOk", () => {
+    const result = normalizeExpansion(
+      { titles: ["AI Engineer Intern"], locations: ["Remote", "Bengaluru", "Work from Home"] },
+      "AI internship",
+    );
+
+    expect(result.locations).toEqual(["Bengaluru"]);
+    expect(result.remoteOk).toBe(true);
+  });
+
+  it("uses the profile name when the model returns nothing usable", () => {
+    const result = normalizeExpansion({}, "internship", "AI Engineer");
+    expect(result.titles).toContain("AI Engineer");
+    expect(result.titles.some((title) => /machine learning/i.test(title))).toBe(true);
   });
 });

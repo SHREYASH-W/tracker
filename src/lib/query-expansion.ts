@@ -206,8 +206,8 @@ function uniqueStrings(values: unknown, limit: number, maxLength = 120): string[
 }
 
 /** Deterministic expansion that always works offline — the LLM fallback. */
-export function heuristicExpansion(prompt: string): QueryExpansionResult {
-  const text = prompt.trim();
+export function heuristicExpansion(prompt: string, context?: string): QueryExpansionResult {
+  const text = [context?.trim(), prompt.trim()].filter(Boolean).join(" ");
   const roleType = detectRoleType(text);
   const experienceLevel = detectExperienceLevel(text);
   const matched = ROLE_FAMILIES.filter((family) => family.pattern.test(text));
@@ -264,6 +264,25 @@ function coerceEnum<T extends string>(value: string | undefined, allowed: readon
   return allowed.includes(normalised as T) ? (normalised as T) : fallback;
 }
 
+const REMOTE_LOCATION_PATTERN =
+  /^(remote(?:\s+only)?|fully remote|anywhere|worldwide|global|work from home|wfh|hybrid)$/i;
+
+/** Remote is a work mode, not a city — move such entries into remoteOk. */
+function splitRemoteLocations(values: string[]): { locations: string[]; mentionsRemote: boolean } {
+  const locations: string[] = [];
+  let mentionsRemote = false;
+
+  for (const value of values) {
+    if (REMOTE_LOCATION_PATTERN.test(value.trim())) {
+      mentionsRemote = true;
+      continue;
+    }
+    locations.push(value);
+  }
+
+  return { locations, mentionsRemote };
+}
+
 /**
  * Merge raw LLM output with heuristic defaults, dedupe and cap everything.
  * Empty LLM fields fall back to the deterministic expansion.
@@ -271,12 +290,13 @@ function coerceEnum<T extends string>(value: string | undefined, allowed: readon
 export function normalizeExpansion(
   raw: RawQueryExpansion,
   prompt: string,
+  context?: string,
 ): QueryExpansionResult {
-  const fallback = heuristicExpansion(prompt);
+  const fallback = heuristicExpansion(prompt, context);
 
   const titles = uniqueStrings(raw.titles, 12);
   const keywords = uniqueStrings(raw.keywords, 20);
-  const locations = uniqueStrings(raw.locations, 8);
+  const { locations, mentionsRemote } = splitRemoteLocations(uniqueStrings(raw.locations, 8));
   const excludedKeywords = uniqueStrings(raw.excludedKeywords, 10);
 
   const summary = typeof raw.summary === "string" ? raw.summary.trim().slice(0, 280) : undefined;
@@ -288,18 +308,25 @@ export function normalizeExpansion(
     excludedKeywords,
     roleType: coerceEnum(raw.roleType, SEARCH_ROLE_TYPES, fallback.roleType),
     experienceLevel: coerceEnum(raw.experienceLevel, EXPERIENCE_LEVELS, fallback.experienceLevel),
-    remoteOk: typeof raw.remoteOk === "boolean" ? raw.remoteOk : fallback.remoteOk,
+    remoteOk:
+      raw.remoteOk === true ||
+      mentionsRemote ||
+      (raw.remoteOk === undefined && fallback.remoteOk),
     ...(summary ? { summary } : fallback.summary ? { summary: fallback.summary } : {}),
   };
 }
 
 /** Parse an LLM response into a normalised expansion, or null if unusable. */
-export function parseQueryExpansion(text: string, prompt: string): QueryExpansionResult | null {
+export function parseQueryExpansion(
+  text: string,
+  prompt: string,
+  context?: string,
+): QueryExpansionResult | null {
   const parsed = parseJsonLoose(text);
   if (parsed === null || typeof parsed !== "object") return null;
 
   const checked = queryExpansionSchema.safeParse(parsed);
   if (!checked.success) return null;
 
-  return normalizeExpansion(checked.data, prompt);
+  return normalizeExpansion(checked.data, prompt, context);
 }
