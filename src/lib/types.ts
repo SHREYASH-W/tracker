@@ -1,10 +1,23 @@
 import type {
+  answerBank,
+  applications,
+  applyQueue,
+  automationRuns,
   companies,
+  emailDrafts,
   interactions,
+  jobMatches,
+  jobSources,
+  jobs,
   messageTemplates,
   opportunities,
   outreachRecords,
   people,
+  personJobs,
+  providerUsage,
+  resumeProfiles,
+  resumes,
+  searchProfiles,
   settings,
 } from "@/db/schema";
 
@@ -29,6 +42,54 @@ export type MessageTemplate = typeof messageTemplates.$inferSelect;
 export type NewMessageTemplate = typeof messageTemplates.$inferInsert;
 
 export type Setting = typeof settings.$inferSelect;
+
+export type SearchProfile = typeof searchProfiles.$inferSelect;
+export type NewSearchProfile = typeof searchProfiles.$inferInsert;
+
+export type Resume = typeof resumes.$inferSelect;
+export type NewResume = typeof resumes.$inferInsert;
+
+export type ResumeProfile = typeof resumeProfiles.$inferSelect;
+export type NewResumeProfile = typeof resumeProfiles.$inferInsert;
+
+export type Job = typeof jobs.$inferSelect;
+export type NewJob = typeof jobs.$inferInsert;
+
+export type JobSource = typeof jobSources.$inferSelect;
+export type NewJobSource = typeof jobSources.$inferInsert;
+
+export type JobMatch = typeof jobMatches.$inferSelect;
+export type NewJobMatch = typeof jobMatches.$inferInsert;
+
+export type Application = typeof applications.$inferSelect;
+export type NewApplication = typeof applications.$inferInsert;
+
+export type ApplyQueueItem = typeof applyQueue.$inferSelect;
+export type NewApplyQueueItem = typeof applyQueue.$inferInsert;
+
+export type AnswerBankEntry = typeof answerBank.$inferSelect;
+export type NewAnswerBankEntry = typeof answerBank.$inferInsert;
+
+export type EmailDraft = typeof emailDrafts.$inferSelect;
+export type NewEmailDraft = typeof emailDrafts.$inferInsert;
+
+export type ProviderUsage = typeof providerUsage.$inferSelect;
+export type NewProviderUsage = typeof providerUsage.$inferInsert;
+
+export type AutomationRun = typeof automationRuns.$inferSelect;
+export type NewAutomationRun = typeof automationRuns.$inferInsert;
+
+export type PersonJob = typeof personJobs.$inferSelect;
+export type NewPersonJob = typeof personJobs.$inferInsert;
+
+/** A search profile with JSON columns decoded for UI use. */
+export interface SearchProfileView
+  extends Omit<SearchProfile, "titles" | "keywords" | "locations" | "excludedKeywords"> {
+  titles: string[];
+  keywords: string[];
+  locations: string[];
+  excludedKeywords: string[];
+}
 
 /** Minimal company shape for selectors. */
 export interface CompanyOption {

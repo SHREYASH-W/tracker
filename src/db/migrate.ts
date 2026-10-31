@@ -164,6 +164,250 @@ const migrations: { version: number; name: string; sql: string }[] = [
         ('theme', 'system');
     `,
   },
+  {
+    version: 3,
+    name: "automation_foundation",
+    sql: `
+      -- Search profiles: plain-language targets expanded into titles/keywords.
+      CREATE TABLE IF NOT EXISTS search_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        prompt TEXT NOT NULL,
+        titles TEXT NOT NULL DEFAULT '[]',
+        keywords TEXT NOT NULL DEFAULT '[]',
+        role_type TEXT NOT NULL DEFAULT 'both',
+        locations TEXT NOT NULL DEFAULT '[]',
+        remote_ok INTEGER NOT NULL DEFAULT 0,
+        experience_level TEXT NOT NULL DEFAULT 'any',
+        excluded_keywords TEXT NOT NULL DEFAULT '[]',
+        min_match_score INTEGER NOT NULL DEFAULT 60,
+        auto_apply_mode TEXT NOT NULL DEFAULT 'off',
+        auto_apply_threshold INTEGER NOT NULL DEFAULT 80,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE INDEX IF NOT EXISTS search_profiles_active_idx ON search_profiles(active);
+
+      -- Resume files and structured, user-correctable profiles.
+      CREATE TABLE IF NOT EXISTS resumes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        mime_type TEXT,
+        size_bytes INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE INDEX IF NOT EXISTS resumes_active_idx ON resumes(is_active);
+
+      CREATE TABLE IF NOT EXISTS resume_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        resume_id INTEGER NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
+        headline TEXT,
+        summary TEXT,
+        skills TEXT NOT NULL DEFAULT '[]',
+        projects TEXT NOT NULL DEFAULT '[]',
+        education TEXT NOT NULL DEFAULT '[]',
+        experience TEXT NOT NULL DEFAULT '[]',
+        links TEXT NOT NULL DEFAULT '[]',
+        raw_text TEXT,
+        parsed_at INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS resume_profiles_resume_idx ON resume_profiles(resume_id);
+
+      -- Jobs found across ATS and public job boards.
+      CREATE TABLE IF NOT EXISTS jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+        source TEXT NOT NULL,
+        source_job_id TEXT,
+        title TEXT NOT NULL,
+        company_name TEXT NOT NULL,
+        location TEXT,
+        remote INTEGER,
+        role_type TEXT,
+        employment_type TEXT,
+        description TEXT,
+        url TEXT,
+        apply_url TEXT,
+        salary_min INTEGER,
+        salary_max INTEGER,
+        salary_currency TEXT,
+        posted_at INTEGER,
+        closed_at INTEGER,
+        status TEXT NOT NULL DEFAULT 'open',
+        dedupe_hash TEXT NOT NULL,
+        raw TEXT,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS jobs_dedupe_hash_idx ON jobs(dedupe_hash);
+      CREATE INDEX IF NOT EXISTS jobs_company_idx ON jobs(company_id);
+      CREATE INDEX IF NOT EXISTS jobs_source_idx ON jobs(source);
+      CREATE INDEX IF NOT EXISTS jobs_status_idx ON jobs(status);
+      CREATE INDEX IF NOT EXISTS jobs_posted_idx ON jobs(posted_at);
+
+      CREATE TABLE IF NOT EXISTS job_sources (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT NOT NULL,
+        label TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        config TEXT NOT NULL DEFAULT '{}',
+        last_run_at INTEGER,
+        last_status TEXT,
+        last_error TEXT,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS job_sources_key_idx ON job_sources(key);
+
+      CREATE TABLE IF NOT EXISTS job_matches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        profile_id INTEGER NOT NULL REFERENCES search_profiles(id) ON DELETE CASCADE,
+        resume_id INTEGER REFERENCES resumes(id) ON DELETE SET NULL,
+        score INTEGER NOT NULL DEFAULT 0,
+        breakdown TEXT NOT NULL DEFAULT '{}',
+        explanation TEXT,
+        gaps TEXT,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS job_matches_unique_idx ON job_matches(job_id, profile_id, resume_id);
+      CREATE INDEX IF NOT EXISTS job_matches_profile_idx ON job_matches(profile_id);
+      CREATE INDEX IF NOT EXISTS job_matches_score_idx ON job_matches(score);
+
+      -- Applications and the durable apply queue.
+      CREATE TABLE IF NOT EXISTS applications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        resume_id INTEGER REFERENCES resumes(id) ON DELETE SET NULL,
+        person_id INTEGER REFERENCES people(id) ON DELETE SET NULL,
+        profile_id INTEGER REFERENCES search_profiles(id) ON DELETE SET NULL,
+        mode TEXT NOT NULL DEFAULT 'review',
+        status TEXT NOT NULL DEFAULT 'queued',
+        score INTEGER,
+        payload TEXT NOT NULL DEFAULT '{}',
+        screenshot_path TEXT,
+        deep_link TEXT,
+        error TEXT,
+        submitted_at INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE INDEX IF NOT EXISTS applications_job_idx ON applications(job_id);
+      CREATE INDEX IF NOT EXISTS applications_status_idx ON applications(status);
+
+      CREATE TABLE IF NOT EXISTS apply_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        profile_id INTEGER NOT NULL REFERENCES search_profiles(id) ON DELETE CASCADE,
+        resume_id INTEGER REFERENCES resumes(id) ON DELETE SET NULL,
+        application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL,
+        status TEXT NOT NULL DEFAULT 'queued',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 3,
+        next_attempt_at INTEGER,
+        last_error TEXT,
+        deep_link TEXT,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS apply_queue_job_profile_idx ON apply_queue(job_id, profile_id);
+      CREATE INDEX IF NOT EXISTS apply_queue_status_idx ON apply_queue(status);
+      CREATE INDEX IF NOT EXISTS apply_queue_next_attempt_idx ON apply_queue(next_attempt_at);
+
+      CREATE TABLE IF NOT EXISTS answer_bank (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT NOT NULL,
+        question TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        category TEXT,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS answer_bank_key_idx ON answer_bank(key);
+
+      -- Outreach drafts awaiting review or send.
+      CREATE TABLE IF NOT EXISTS email_drafts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+        outreach_id INTEGER REFERENCES outreach_records(id) ON DELETE SET NULL,
+        job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+        template_id INTEGER REFERENCES message_templates(id) ON DELETE SET NULL,
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft',
+        model TEXT,
+        approved_at INTEGER,
+        sent_at INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE INDEX IF NOT EXISTS email_drafts_person_idx ON email_drafts(person_id);
+      CREATE INDEX IF NOT EXISTS email_drafts_status_idx ON email_drafts(status);
+
+      -- Per-provider, per-operation daily quota accounting.
+      CREATE TABLE IF NOT EXISTS provider_usage (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        day TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 0,
+        quota_limit INTEGER,
+        metadata TEXT NOT NULL DEFAULT '{}',
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS provider_usage_unique_idx ON provider_usage(provider, operation, day);
+      CREATE INDEX IF NOT EXISTS provider_usage_day_idx ON provider_usage(day);
+
+      -- Background run logs.
+      CREATE TABLE IF NOT EXISTS automation_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'queued',
+        profile_id INTEGER REFERENCES search_profiles(id) ON DELETE SET NULL,
+        stats TEXT NOT NULL DEFAULT '{}',
+        log TEXT,
+        started_at INTEGER,
+        finished_at INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE INDEX IF NOT EXISTS automation_runs_kind_idx ON automation_runs(kind);
+      CREATE INDEX IF NOT EXISTS automation_runs_status_idx ON automation_runs(status);
+
+      -- Contacts linked to the jobs they are relevant to.
+      CREATE TABLE IF NOT EXISTS person_jobs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        person_id INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        relevance TEXT,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS person_jobs_unique_idx ON person_jobs(person_id, job_id);
+      CREATE INDEX IF NOT EXISTS person_jobs_job_idx ON person_jobs(job_id);
+
+      -- Seed the source registry. Aggregators that need a key start disabled.
+      INSERT OR IGNORE INTO job_sources (key, label, kind, enabled, config) VALUES
+        ('greenhouse', 'Greenhouse', 'ats', 1, '{}'),
+        ('lever', 'Lever', 'ats', 1, '{}'),
+        ('ashby', 'Ashby', 'ats', 1, '{}'),
+        ('remotive', 'Remotive', 'remote_board', 1, '{}'),
+        ('remoteok', 'RemoteOK', 'remote_board', 1, '{}'),
+        ('arbeitnow', 'Arbeitnow', 'job_board', 1, '{}'),
+        ('themuse', 'The Muse', 'job_board', 1, '{}'),
+        ('hn_who_is_hiring', 'HN Who is Hiring', 'community', 1, '{}'),
+        ('adzuna', 'Adzuna', 'aggregator', 0, '{}'),
+        ('jsearch', 'JSearch (RapidAPI)', 'aggregator', 0, '{}');
+    `,
+  },
 ];
 
 // --- Runner ---------------------------------------------------------------
@@ -201,20 +445,32 @@ export function runMigrations(client: MigrationClient): { applied: number; skipp
     return { applied: 0, skipped: migrations.length };
   }
 
-  // node:sqlite exposes no transaction helper, so apply each migration atomically by hand.
+  // BEGIN IMMEDIATE serializes writers so parallel build workers cannot apply
+  // the same migration twice: the loser waits, then re-checks the version.
+  let applied = 0;
   for (const migration of pending) {
-    client.exec("BEGIN");
+    client.exec("BEGIN IMMEDIATE");
     try {
+      if (getCurrentVersion(client) >= migration.version) {
+        client.exec("COMMIT");
+        continue;
+      }
+
       client.exec(migration.sql);
       client
-        .prepare("INSERT INTO _schema_version (version, name) VALUES (?, ?)")
+        .prepare("INSERT OR IGNORE INTO _schema_version (version, name) VALUES (?, ?)")
         .run(migration.version, migration.name);
       client.exec("COMMIT");
+      applied++;
     } catch (err) {
-      client.exec("ROLLBACK");
+      try {
+        client.exec("ROLLBACK");
+      } catch {
+        // Ignore rollback errors; the transaction may already be closed.
+      }
       throw err;
     }
   }
 
-  return { applied: pending.length, skipped: currentVersion };
+  return { applied, skipped: migrations.length - applied };
 }

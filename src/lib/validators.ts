@@ -1,8 +1,10 @@
 import { z } from "zod";
 import {
   CHANNEL_VALUES,
+  EXPERIENCE_LEVELS,
   INTERACTION_TYPES,
   PURPOSE_VALUES,
+  SEARCH_ROLE_TYPES,
   STATUS_VALUES,
   TEMPLATE_CATEGORIES,
 } from "./constants";
@@ -182,6 +184,28 @@ export const hrContactImportSchema = z.object({
 });
 
 export type HrContactImportData = z.infer<typeof hrContactImportSchema>;
+
+// --- Search profile form --------------------------------------------------
+
+export const searchProfileSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120),
+  prompt: z
+    .string()
+    .trim()
+    .min(2, "Describe the role you are targeting")
+    .max(200, "Target description is too long"),
+  titles: z.array(z.string().trim().min(1).max(120)).max(30).default([]),
+  keywords: z.array(z.string().trim().min(1).max(80)).max(40).default([]),
+  roleType: z.enum(SEARCH_ROLE_TYPES).default("both"),
+  locations: z.array(z.string().trim().min(1).max(120)).max(20).default([]),
+  remoteOk: z.boolean().default(true),
+  experienceLevel: z.enum(EXPERIENCE_LEVELS).default("any"),
+  excludedKeywords: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
+  minMatchScore: z.coerce.number().int().min(0).max(100).default(60),
+  active: z.boolean().default(true),
+});
+
+export type SearchProfileFormData = z.infer<typeof searchProfileSchema>;
 
 // --- Interaction form ------------------------------------------------------
 

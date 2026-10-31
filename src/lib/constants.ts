@@ -224,10 +224,45 @@ export function isActiveOutreachStatus(status: string): boolean {
   return status !== "not_contacted" && !isClosedStatus(status);
 }
 
+// --- Search profiles ------------------------------------------------------
+
+export const SEARCH_ROLE_TYPES = ["internship", "full_time", "both"] as const;
+
+export type SearchRoleType = (typeof SEARCH_ROLE_TYPES)[number];
+
+export const SEARCH_ROLE_TYPE_LABELS: Record<SearchRoleType, string> = {
+  internship: "Internship",
+  full_time: "Full-time",
+  both: "Both",
+};
+
+export const EXPERIENCE_LEVELS = ["any", "student", "entry", "mid", "senior"] as const;
+
+export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number];
+
+export const EXPERIENCE_LEVEL_LABELS: Record<ExperienceLevel, string> = {
+  any: "Any level",
+  student: "Student",
+  entry: "Entry level",
+  mid: "Mid level",
+  senior: "Senior",
+};
+
+export const AUTO_APPLY_MODES = ["off", "review", "auto"] as const;
+
+export type AutoApplyMode = (typeof AUTO_APPLY_MODES)[number];
+
+export const AUTO_APPLY_MODE_LABELS: Record<AutoApplyMode, string> = {
+  off: "Off",
+  review: "Review before submit",
+  auto: "Auto-submit",
+};
+
 // --- Navigation -----------------------------------------------------------
 
 export const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: "LayoutDashboard" },
+  { href: "/search-profiles", label: "Search Profiles", icon: "Target" },
   { href: "/people", label: "People Directory", icon: "Users" },
   { href: "/find-hr", label: "Find HR Contacts", icon: "UserSearch" },
   { href: "/companies", label: "Companies", icon: "Building2" },

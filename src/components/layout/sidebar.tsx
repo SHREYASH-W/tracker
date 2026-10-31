@@ -9,6 +9,7 @@ import {
   Activity,
   MessageSquare,
   Settings,
+  Target,
   UserSearch,
   X,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/search-profiles", label: "Search Profiles", icon: Target },
   { href: "/people", label: "People Directory", icon: Users },
   { href: "/find-hr", label: "Find HR Contacts", icon: UserSearch },
   { href: "/companies", label: "Companies", icon: Building2 },

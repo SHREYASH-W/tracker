@@ -4,6 +4,7 @@ import {
   companySchema,
   hrContactImportSchema,
   interactionSchema,
+  searchProfileSchema,
   templateSchema,
 } from "./validators";
 
@@ -156,5 +157,57 @@ describe("templateSchema", () => {
   it("rejects an empty body", () => {
     const result = templateSchema.safeParse({ name: "Intro", category: "Other", body: "  " });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("searchProfileSchema", () => {
+  const baseProfile = {
+    name: "AI internships",
+    prompt: "AI/ML internship, remote or Bengaluru",
+  };
+
+  it("applies defaults for a minimal profile", () => {
+    const parsed = searchProfileSchema.parse(baseProfile);
+    expect(parsed.titles).toEqual([]);
+    expect(parsed.keywords).toEqual([]);
+    expect(parsed.locations).toEqual([]);
+    expect(parsed.excludedKeywords).toEqual([]);
+    expect(parsed.roleType).toBe("both");
+    expect(parsed.remoteOk).toBe(true);
+    expect(parsed.experienceLevel).toBe("any");
+    expect(parsed.minMatchScore).toBe(60);
+    expect(parsed.active).toBe(true);
+  });
+
+  it("trims text and coerces the match score", () => {
+    const parsed = searchProfileSchema.parse({
+      ...baseProfile,
+      name: "  AI/ML  ",
+      titles: ["  ML Intern  "],
+      minMatchScore: "75",
+    });
+    expect(parsed.name).toBe("AI/ML");
+    expect(parsed.titles).toEqual(["ML Intern"]);
+    expect(parsed.minMatchScore).toBe(75);
+  });
+
+  it("requires a name and a description", () => {
+    expect(searchProfileSchema.safeParse({ name: " ", prompt: "AI" }).success).toBe(false);
+    expect(searchProfileSchema.safeParse({ name: "X", prompt: " " }).success).toBe(false);
+    expect(
+      searchProfileSchema.safeParse({ name: "X", prompt: "a".repeat(201) }).success,
+    ).toBe(false);
+  });
+
+  it("rejects unknown role types and out-of-range scores", () => {
+    expect(
+      searchProfileSchema.safeParse({ ...baseProfile, roleType: "contract" }).success,
+    ).toBe(false);
+    expect(
+      searchProfileSchema.safeParse({ ...baseProfile, minMatchScore: 120 }).success,
+    ).toBe(false);
+    expect(
+      searchProfileSchema.safeParse({ ...baseProfile, experienceLevel: "principal" }).success,
+    ).toBe(false);
   });
 });

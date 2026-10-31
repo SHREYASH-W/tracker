@@ -28,6 +28,9 @@ The app is optimized for personal use: data stays on-device in a local SQLite da
 - Database backup endpoint for exporting a SQLite snapshot
 - Local database initialization and migration support
 - Optional third-party email lookup providers for enrichment
+- Search profiles that turn a free-text target (for example “AI/ML internship”) into job titles, keywords, and locations
+- AI-assisted query expansion via Groq, Ollama, or Gemini, with a deterministic offline fallback
+- Automation-ready SQLite schema for jobs, matches, applications, drafts, and provider quotas
 
 ## Product overview
 
@@ -40,6 +43,8 @@ The application is centered on a small data model:
 - Interactions: time-stamped notes and outcomes connected to outreach records
 - Message templates: reusable outreach snippets
 - Settings: key-value preferences and custom status configuration
+- Search profiles: saved job-search targets with editable titles, keywords, locations, and match thresholds
+- Automation tables: jobs, job sources, matches, applications, apply queue, drafts, and provider usage (foundation for the job-hunt pipeline)
 
 This structure allows the app to handle both relationship tracking and outbound work management in one place.
 
@@ -75,7 +80,8 @@ This structure allows the app to handle both relationship tracking and outbound 
 │   │   ├── find-hr/           # HR contact lookup flow
 │   │   ├── follow-ups/        # Follow-up dashboard
 │   │   ├── people/            # People directory and detail pages
-│   │   ├── settings/          # Application settings and data tools
+│   │   ├── search-profiles/   # Automated job-search targets
+│   │   ├── settings/          # Application settings, AI status, and data tools
 │   │   ├── templates/         # Message template pages
 │   │   ├── dashboard-chart.tsx
 │   │   ├── globals.css
@@ -96,11 +102,15 @@ This structure allows the app to handle both relationship tracking and outbound 
 │   │   ├── enrichlayer.ts     # EnrichLayer provider module
 │   │   ├── hunter.ts          # Hunter.io lookup module
 │   │   ├── prospeo.ts         # Prospeo lookup module
+│   │   ├── query-expansion.ts # Target → titles/keywords heuristics and parsing
 │   │   ├── queries.ts         # Query helpers
 │   │   ├── types.ts           # Shared TypeScript interfaces
 │   │   └── validators.ts     # Form validation and schemas
 │   └── server/
-│       └── actions/           # Server actions for DB access and app logic
+│       ├── actions/           # Server actions for DB access and app logic
+│       ├── llm/               # LLM provider abstraction (Groq, Ollama, Gemini)
+│       ├── providers/         # Rate limiting, TTL cache, quota tracking
+│       └── search-profiles/   # Search profile repository
 └── data/                      # Local SQLite database directory
 ```
 
@@ -158,13 +168,34 @@ Available variables from `.env.example`:
 
 # Enrich Layer token for the contact email lookup (server-side only)
 # ENRICH_LAYER_API_KEY=
+
+# --- AI (LLM) providers ---------------------------------------------------
+# Primary provider: groq | ollama | gemini
+# LLM_PROVIDER=groq
+# Comma-separated fallbacks tried in order
+# LLM_FALLBACKS=ollama,gemini
+
+# GROQ_API_KEY=
+# GROQ_MODEL=openai/gpt-oss-20b
+
+# OLLAMA_BASE_URL=http://127.0.0.1:11434
+# OLLAMA_MODEL=llama3.1
+# OLLAMA_ENABLED=true
+
+# GEMINI_API_KEY=
+# GEMINI_MODEL=gemini-2.5-flash
+
+# LLM_RATE_LIMIT_PER_MINUTE=20
+# LLM_CACHE_TTL_MS=600000
 ```
 
 Notes:
 
 - The local database is created automatically when the app starts.
 - Backups are generated using SQLite `VACUUM INTO` commands.
-- Email lookup providers are optional and are used only when configured.
+- Email lookup and LLM providers are optional and are used only when configured.
+- API keys are read on the server only. Never prefix them with `NEXT_PUBLIC_`.
+- If no LLM responds, search-profile expansion falls back to built-in rules so the app remains usable offline.
 
 ## Database and migrations
 
@@ -223,9 +254,28 @@ The home dashboard presents:
 - outreach status distribution chart
 - company breakdown chart
 
+### Search profiles and AI
+
+The `/search-profiles` page replaces manual company-domain entry with a free-text target:
+
+1. Describe the role, for example “AI/ML internship in Bengaluru, remote ok”.
+2. Click **Expand with AI** (or type terms manually). Expansion produces job titles, keywords, locations, role type, and experience level.
+3. Edit any chip, set a minimum match score, and save.
+
+Expansion runs through a provider chain (Groq → Ollama → Gemini) with rate limiting, a short TTL cache, and daily quota counters. Provider failures fall back to the next provider without breaking the page. Without any provider, a deterministic rule-based expansion is used.
+
+The Settings page shows which provider is active and how many calls were made today. Keys never reach the browser.
+
 ### Follow-ups and activity
 
 The app tracks when a person is due for follow-up, identifies overdue items, and maintains an activity timeline of interactions and record changes.
+
+## Safety and source policy
+
+- No LinkedIn, Indeed, or Glassdoor scraping or automation.
+- Email lookup and LLM providers are optional; the app works offline with local rules.
+- All external calls are rate-limited and cached, and failures degrade gracefully.
+- Search expansion and generated content must stay grounded in your own resume and data.
 
 ## Development notes
 
@@ -242,6 +292,8 @@ No explicit license file is present in the repository at this time. If you plan 
 
 This repository is a working local CRM-style application for professional outreach tracking. It is ready for local development and day-to-day use as a personal contact and follow-up organizer.
 
+The job-hunt automation is being built in phases. Phase 1 is complete: automation schema and migrations, search profiles, and the LLM provider layer. Upcoming phases add resume parsing, job ingestion and matching, contact discovery, outreach drafting, and guarded auto-apply.
+
 ---
 
-If you want to extend the app further, the most natural next steps are adding user authentication, syncing data to a cloud database, or layering in richer analytics and duplicate detection across contacts.
+If you want to extend the app further, the most natural next steps are job-source adapters, resume-aware match scoring, and a background worker for scheduled runs.

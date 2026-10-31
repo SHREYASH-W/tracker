@@ -1,14 +1,32 @@
 "use client";
 import * as React from "react";
-import { Download, Upload, AlertTriangle, Moon, Sun, Monitor } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleSlash,
+  Download,
+  Monitor,
+  Moon,
+  Sparkles,
+  Sun,
+  Upload,
+} from "lucide-react";
 import { useTheme } from "next-themes";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { toast } from "@/components/ui/use-toast";
 import { exportFullBackup, restoreBackup } from "@/server/actions/import-export";
+import type { getLlmStatus } from "@/server/llm";
+import type { UsageSnapshot } from "@/server/providers/usage";
 
-export function SettingsClient() {
+interface SettingsClientProps {
+  llm: ReturnType<typeof getLlmStatus>;
+  usage: UsageSnapshot[];
+}
+
+export function SettingsClient({ llm, usage }: SettingsClientProps) {
   const { theme, setTheme } = useTheme();
   const [restoreOpen, setRestoreOpen] = React.useState(false);
   const [pendingJson, setPendingJson] = React.useState<string | null>(null);
@@ -93,6 +111,98 @@ export function SettingsClient() {
         </CardContent>
       </Card>
 
+      {/* AI provider */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="h-4 w-4 text-primary" />
+                AI Provider
+              </CardTitle>
+              <CardDescription>
+                Powers query expansion, job-match explanations and outreach drafts.
+              </CardDescription>
+            </div>
+            <Badge variant={llm.anyConfigured ? "success" : "outline"}>
+              {llm.anyConfigured ? "Ready" : "Rules only"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            {llm.providers.map((provider) => (
+              <div
+                key={provider.id}
+                className="flex items-center justify-between gap-3 rounded-md border p-3"
+              >
+                <div className="flex items-center gap-2.5">
+                  {provider.configured ? (
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                  ) : (
+                    <CircleSlash className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">{provider.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {provider.model} · {provider.local ? "local" : "cloud"}
+                    </p>
+                  </div>
+                </div>
+                <Badge
+                  variant={
+                    provider.configured
+                      ? llm.primary === provider.id
+                        ? "default"
+                        : "outline"
+                      : "outline"
+                  }
+                >
+                  {provider.configured
+                    ? llm.primary === provider.id
+                      ? "Primary"
+                      : "Fallback"
+                    : "Not configured"}
+                </Badge>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Groq is used first when <code className="rounded bg-muted px-1 py-0.5">GROQ_API_KEY</code> is
+            set. Ollama runs locally on port 11434 and Gemini is optional. With no provider configured,
+            query expansion falls back to built-in rules so the app keeps working.
+          </p>
+
+          {usage.length > 0 && (
+            <div className="rounded-md border bg-muted/30 p-3">
+              <p className="mb-1 text-xs font-medium">Calls today (UTC)</p>
+              <ul className="space-y-0.5 text-xs text-muted-foreground">
+                {usage.map((row) => (
+                  <li
+                    key={`${row.provider}-${row.operation}`}
+                    className="flex justify-between gap-3"
+                  >
+                    <span>
+                      {row.provider} · {row.operation}
+                    </span>
+                    <span>
+                      {row.count}
+                      {row.quotaLimit !== null ? ` / ${row.quotaLimit}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            API keys live in <code className="rounded bg-muted px-1 py-0.5">.env.local</code> and are only
+            read by the server — they never reach the browser.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Backup & restore */}
       <Card>
         <CardHeader className="pb-2">
@@ -146,7 +256,7 @@ export function SettingsClient() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-1">
           <p>All data is stored locally in a SQLite database at <code className="text-xs bg-muted px-1 py-0.5 rounded">./data/contact_crm.db</code>.</p>
-          <p>No data is sent to external servers. Your contacts are private and stay on this machine.</p>
+          <p>Optional email lookup and AI providers only receive the specific query or contact details you trigger. Keys stay on the server.</p>
           <p>Back up the database file directly or use the JSON backup above to preserve your data.</p>
         </CardContent>
       </Card>
