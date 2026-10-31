@@ -42,7 +42,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
         initialData={directoryResult}
         summary={summary}
         companies={companies.map((c) => ({ id: c.company.id, name: c.company.name }))}
-        initialFilters={sp}
+        initialFilters={sp as Record<string, string | undefined>}
       />
     </Suspense>
   );

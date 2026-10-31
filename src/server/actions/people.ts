@@ -222,15 +222,13 @@ export async function createPersonWithOutreach(formData: unknown): Promise<Actio
   }
   const data = parsed.data;
 
-  const tx = sqlite.raw.prepare("BEGIN DEFERRED");
-
   try {
     sqlite.raw.exec("BEGIN DEFERRED");
 
     // Resolve or create company
     let companyId = data.companyId;
     if (!companyId) {
-      const existing = sqlite.raw.prepare(`SELECT id FROM companies WHERE LOWER(name) = LOWER(?) LIMIT 1`).get(data.companyName) as { id: number } | undefined;
+      const existing = sqlite.raw.prepare(`SELECT id FROM companies WHERE LOWER(name) = LOWER(?) LIMIT 1`).get(data.companyName ?? "") as { id: number } | undefined;
       if (existing) {
         companyId = existing.id;
       } else {
@@ -238,7 +236,7 @@ export async function createPersonWithOutreach(formData: unknown): Promise<Actio
           INSERT INTO companies (name, website, industry, location, linkedin_url, size, notes)
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `).run(
-          data.companyName, data.companyWebsite ?? null, data.companyIndustry ?? null,
+          data.companyName ?? "", data.companyWebsite ?? null, data.companyIndustry ?? null,
           data.companyLocation ?? null, data.companyLinkedinUrl ?? null,
           data.companySize ?? null, data.companyNotes ?? null
         );

@@ -175,7 +175,7 @@ export async function exportPeopleCsv(personIds?: number[]): Promise<string> {
     r.full_name, r.email, r.phone, r.job_title, r.department,
     r.company_name, r.linkedin_url, r.location,
     r.purpose, r.target_role, r.channel, r.status, r.notes,
-  ]);
+  ] as (string | number | null | undefined)[]);
 
   return toCsv([headers, ...data]);
 }
@@ -234,7 +234,7 @@ export async function restoreBackup(jsonText: string): Promise<ActionResult<{ re
       const cols = Object.keys(sample);
       const placeholders = cols.map(() => "?").join(",");
       const stmt = sqlite.raw.prepare(`INSERT INTO ${table} (${cols.join(",")}) VALUES (${placeholders})`);
-      rows.forEach((row) => stmt.run(...Object.values(row as Record<string, unknown>)));
+      rows.forEach((row) => stmt.run(...(Object.values(row as Record<string, unknown>) as import("node:sqlite").SQLInputValue[])));
       restored[table] = rows.length;
     };
 

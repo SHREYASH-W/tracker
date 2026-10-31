@@ -10,17 +10,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { interactionSchema, type InteractionFormData } from "@/lib/validators";
+import { interactionSchema } from "@/lib/validators";
 import { INTERACTION_TYPES, CHANNEL_VALUES } from "@/lib/constants";
 import { logInteraction } from "@/server/actions/outreach";
 import { toast } from "@/components/ui/use-toast";
 import { timestampToDateInput } from "@/lib/utils";
+import type { z } from "zod";
+
+type InteractionInput = z.input<typeof interactionSchema>;
 
 export function LogInteractionDialog({ open, onOpenChange, outreachRecordId }: { open: boolean; onOpenChange: (v: boolean) => void; outreachRecordId: number }) {
   const router = useRouter();
   const [isPending, setIsPending] = React.useState(false);
   const today = timestampToDateInput(Date.now());
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<InteractionFormData>({
+  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<InteractionInput>({
     resolver: zodResolver(interactionSchema),
     defaultValues: { outreachRecordId, occurredAt: today, interactionType: "Message Sent" },
   });
@@ -29,7 +32,8 @@ export function LogInteractionDialog({ open, onOpenChange, outreachRecordId }: {
     if (open) reset({ outreachRecordId, occurredAt: today, interactionType: "Message Sent" });
   }, [open, outreachRecordId, reset, today]);
 
-  const onSubmit = async (data: InteractionFormData) => {
+
+  const onSubmit = async (data: Record<string, unknown>) => {
     setIsPending(true);
     const result = await logInteraction(data);
     setIsPending(false);
@@ -51,7 +55,7 @@ export function LogInteractionDialog({ open, onOpenChange, outreachRecordId }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Interaction Type *</Label>
-              <Select defaultValue="Message Sent" onValueChange={(v) => setValue("interactionType", v as InteractionFormData["interactionType"])}>
+              <Select defaultValue="Message Sent" onValueChange={(v) => setValue("interactionType", v as InteractionInput["interactionType"])}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>{INTERACTION_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
@@ -59,7 +63,7 @@ export function LogInteractionDialog({ open, onOpenChange, outreachRecordId }: {
             </div>
             <div>
               <Label>Channel</Label>
-              <Select onValueChange={(v) => setValue("channel", v as InteractionFormData["channel"])}>
+              <Select onValueChange={(v) => setValue("channel", v as InteractionInput["channel"])}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Select channel" /></SelectTrigger>
                 <SelectContent>{CHANNEL_VALUES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>

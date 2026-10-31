@@ -62,10 +62,10 @@ export async function deleteTemplate(id: number): Promise<ActionResult> {
 }
 
 /** Fill template variables with real values. */
-export function previewTemplate(
+export async function previewTemplate(
   body: string,
   vars: { name?: string; company?: string; role?: string; myBackground?: string },
-): string {
+): Promise<string> {
   return body
     .replace(/\{\{name\}\}/g, vars.name ?? "[Name]")
     .replace(/\{\{company\}\}/g, vars.company ?? "[Company]")
